@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -144,5 +145,10 @@ func main() {
 
 	log.Println("webhook server listening on port", *flPort)
 	http.HandleFunc("/webhook", s.handleWebhook)
+
+	http.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+		io.WriteString(w, "Hello, world!")
+	})
+
 	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(*flPort), nil))
 }
