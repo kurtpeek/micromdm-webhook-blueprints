@@ -50,12 +50,18 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		s.handleConnect(event)
 	case "mdm.CheckOut":
 		s.handleCheckOut(event)
+	default:
+		logrus.Warnf("The event's topic was not mdm.Authenticate, mdm.TokenUpdate, mdm.Connect, or mdm.Checkout. It was %q", event.Topic)
 	}
 }
 
 // Authenticate messages are sent when the device is installing a MDM payload.
 func (s *Server) handleAuthenticate(event webhook.Event) {
 	logrus.Infof("handleAuthenticate for event %+v", event)
+	if event.CheckinEvent == nil {
+		logrus.Error("The event has no CheckinEvent")
+	}
+
 	d, exists := s.Devices[event.CheckinEvent.UDID]
 	d.UDID = event.CheckinEvent.UDID
 	d.Enrolled = false
@@ -75,6 +81,10 @@ func (s *Server) handleAuthenticate(event webhook.Event) {
 // first token update message.
 func (s *Server) handleTokenUpdate(event webhook.Event) {
 	logrus.Infof("handleTokenUpdate for event %+v", event)
+	if event.CheckinEvent == nil {
+		logrus.Error("The event has no CheckinEvent")
+	}
+
 	d := s.Devices[event.CheckinEvent.UDID]
 	d.UDID = event.CheckinEvent.UDID
 	d.Enrolled = true
@@ -89,6 +99,11 @@ func (s *Server) handleTokenUpdate(event webhook.Event) {
 // https://developer.apple.com/enterprise/documentation/MDM-Protocol-Reference.pdf
 func (s *Server) handleConnect(event webhook.Event) {
 	logrus.Infof("handleConnect for event %+v", event)
+	if event.AcknowledgeEvent == nil {
+		logrus.Error("The event has no AcknowledgeEvent")
+		return
+	}
+
 	xml := string(event.AcknowledgeEvent.RawPayload)
 	if strings.Contains(xml, "InstalledApplicationList") {
 		log.Println(xml)
@@ -100,6 +115,10 @@ func (s *Server) handleConnect(event webhook.Event) {
 // message when the MDM profile is removed.
 func (s *Server) handleCheckOut(event webhook.Event) {
 	logrus.Infof("handeCheckOUt for event %+v", event)
+	if event.CheckinEvent == nil {
+		logrus.Error("The event has no CheckinEvent")
+	}
+
 	d := s.Devices[event.CheckinEvent.UDID]
 	d.UDID = event.CheckinEvent.UDID
 	d.Enrolled = false
