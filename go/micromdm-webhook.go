@@ -17,17 +17,20 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Device represents a device
 type Device struct {
 	UDID     string
 	Enrolled bool
 }
 
+// Server represents an MDM server
 type Server struct {
 	MDMServerURL string
 	MDMAPIKey    string
 	Devices      map[string]Device
 }
 
+// Command represents an MDM command
 type Command struct {
 	UDID        string `json:"udid"`
 	RequestType string `json:"request_type"`
@@ -44,23 +47,25 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 
 	switch event.Topic {
 	case mdm.AuthenticateTopic:
-		s.handleAuthenticate(event)
+		s.handleAuthenticate(event, w)
 	case mdm.TokenUpdateTopic:
-		s.handleTokenUpdate(event)
+		s.handleTokenUpdate(event, w)
 	case mdm.ConnectTopic:
-		s.handleConnect(event)
+		s.handleConnect(event, w)
 	case mdm.CheckoutTopic:
-		s.handleCheckOut(event)
+		s.handleCheckOut(event, w)
 	default:
 		logrus.Warnf("The event's topic was not mdm.Authenticate, mdm.TokenUpdate, mdm.Connect, or mdm.Checkout. It was %q", event.Topic)
 	}
 }
 
 // Authenticate messages are sent when the device is installing a MDM payload.
-func (s *Server) handleAuthenticate(event webhook.Event) {
+func (s *Server) handleAuthenticate(event webhook.Event, w http.ResponseWriter) {
 	logrus.Infof("handleAuthenticate for event %+v", event)
 	if event.CheckinEvent == nil {
 		logrus.Error("The event has no CheckinEvent")
+		http.Error(w, "The event has no CheckinEvent", http.StatusBadRequest)
+		return
 	}
 
 	d, exists := s.Devices[event.CheckinEvent.UDID]
@@ -80,10 +85,12 @@ func (s *Server) handleAuthenticate(event webhook.Event) {
 // token update message to the server when it has installed the MDM payload.
 // The server should send push messages to the device only after receiving the
 // first token update message.
-func (s *Server) handleTokenUpdate(event webhook.Event) {
+func (s *Server) handleTokenUpdate(event webhook.Event, w http.ResponseWriter) {
 	logrus.Infof("handleTokenUpdate for event %+v", event)
 	if event.CheckinEvent == nil {
 		logrus.Error("The event has no CheckinEvent")
+		http.Error(w, "The event has no CheckinEvent", http.StatusBadRequest)
+		return
 	}
 
 	d := s.Devices[event.CheckinEvent.UDID]
@@ -98,10 +105,11 @@ func (s *Server) handleTokenUpdate(event webhook.Event) {
 // contain the raw responses from the device.
 //
 // https://developer.apple.com/enterprise/documentation/MDM-Protocol-Reference.pdf
-func (s *Server) handleConnect(event webhook.Event) {
+func (s *Server) handleConnect(event webhook.Event, w http.ResponseWriter) {
 	logrus.Infof("handleConnect for event %+v", event)
 	if event.AcknowledgeEvent == nil {
 		logrus.Error("The event has no AcknowledgeEvent")
+		http.Error(w, "The event has no AcknowledgeEvent", http.StatusBadRequest)
 		return
 	}
 
@@ -114,10 +122,12 @@ func (s *Server) handleConnect(event webhook.Event) {
 // In iOS 5.0 and later, and in macOS v10.9, if the CheckOutWhenRemoved key in
 // the MDM payload is set to true, the device attempts to send a CheckOut
 // message when the MDM profile is removed.
-func (s *Server) handleCheckOut(event webhook.Event) {
+func (s *Server) handleCheckOut(event webhook.Event, w http.ResponseWriter) {
 	logrus.Infof("handeCheckOUt for event %+v", event)
 	if event.CheckinEvent == nil {
 		logrus.Error("The event has no CheckinEvent")
+		http.Error(w, "The event has no CheckinEvent", http.StatusBadRequest)
+		return
 	}
 
 	d := s.Devices[event.CheckinEvent.UDID]
