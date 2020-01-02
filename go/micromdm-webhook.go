@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/micromdm/micromdm/workflow/webhook"
+	"github.com/sirupsen/logrus"
 )
 
 type Device struct {
@@ -33,7 +35,8 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	var event webhook.Event
 	err := json.NewDecoder(r.Body).Decode(&event)
 	if err != nil {
-		log.Fatal(err)
+		logrus.Errorf("decode JSON: %v", err)
+		http.Error(w, fmt.Sprintf("decode JSON: %v", err), http.StatusBadRequest)
 		return
 	}
 
@@ -51,6 +54,7 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 
 // Authenticate messages are sent when the device is installing a MDM payload.
 func (s *Server) handleAuthenticate(event webhook.Event) {
+	logrus.Infof("handleAuthenticate for event %+v", event)
 	d, exists := s.Devices[event.CheckinEvent.UDID]
 	d.UDID = event.CheckinEvent.UDID
 	d.Enrolled = false
@@ -69,6 +73,7 @@ func (s *Server) handleAuthenticate(event webhook.Event) {
 // The server should send push messages to the device only after receiving the
 // first token update message.
 func (s *Server) handleTokenUpdate(event webhook.Event) {
+	logrus.Infof("handleTokenUpdate for event %+v", event)
 	d := s.Devices[event.CheckinEvent.UDID]
 	d.UDID = event.CheckinEvent.UDID
 	d.Enrolled = true
@@ -82,6 +87,7 @@ func (s *Server) handleTokenUpdate(event webhook.Event) {
 //
 // https://developer.apple.com/enterprise/documentation/MDM-Protocol-Reference.pdf
 func (s *Server) handleConnect(event webhook.Event) {
+	logrus.Infof("handleConnect for event %+v", event)
 	xml := string(event.AcknowledgeEvent.RawPayload)
 	if strings.Contains(xml, "InstalledApplicationList") {
 		log.Println(xml)
@@ -92,6 +98,7 @@ func (s *Server) handleConnect(event webhook.Event) {
 // the MDM payload is set to true, the device attempts to send a CheckOut
 // message when the MDM profile is removed.
 func (s *Server) handleCheckOut(event webhook.Event) {
+	logrus.Infof("handeCheckOUt for event %+v", event)
 	d := s.Devices[event.CheckinEvent.UDID]
 	d.UDID = event.CheckinEvent.UDID
 	d.Enrolled = false
@@ -111,6 +118,7 @@ func (s *Server) sendCommandToDevice(d Device, requestType string) {
 	req.SetBasicAuth("micromdm", s.MDMAPIKey)
 	_, err = client.Do(req)
 	if err != nil {
+		logrus.Errorf("send command to device: %v", err)
 		log.Fatal(err)
 	}
 }
