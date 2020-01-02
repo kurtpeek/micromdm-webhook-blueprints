@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/micromdm/micromdm/mdm"
 	"github.com/micromdm/micromdm/workflow/webhook"
 	"github.com/sirupsen/logrus"
 )
@@ -42,13 +43,13 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch event.Topic {
-	case "mdm.Authenticate":
+	case mdm.AuthenticateTopic:
 		s.handleAuthenticate(event)
-	case "mdm.TokenUpdate":
+	case mdm.TokenUpdateTopic:
 		s.handleTokenUpdate(event)
-	case "mdm.Connect":
+	case mdm.ConnectTopic:
 		s.handleConnect(event)
-	case "mdm.CheckOut":
+	case mdm.CheckoutTopic:
 		s.handleCheckOut(event)
 	default:
 		logrus.Warnf("The event's topic was not mdm.Authenticate, mdm.TokenUpdate, mdm.Connect, or mdm.Checkout. It was %q", event.Topic)
